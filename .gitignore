@@ -11,3 +11,7 @@ secrets.local.ps1
 cert.pem
 *.tunnel.json
 config.yml
+cf_token.txt
+oauth_login.py
+cf-worker/.wrangler/
+node_modules/

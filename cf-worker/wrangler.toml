@@ -1,0 +1,6 @@
+name = "homepc-remote"
+main = "worker.js"
+compatibility_date = "2025-09-27"
+
+# Served at https://homepc-remote.<your-subdomain>.workers.dev
+workers_dev = true
