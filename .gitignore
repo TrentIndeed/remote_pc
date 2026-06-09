@@ -1,0 +1,13 @@
+.venv/
+__pycache__/
+*.pyc
+tunnel.log
+cloudflared
+cloudflared.exe
+
+# secrets & cloudflared credentials -- never commit
+secrets.local.ps1
+.cloudflared/
+cert.pem
+*.tunnel.json
+config.yml

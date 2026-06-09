@@ -1,0 +1,516 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Home PC</title>
+<style>
+  :root{
+    --bg:#0d1117; --panel:#161b22; --line:#272e3a; --ink:#e6edf3;
+    --muted:#8b949e; --accent:#3b82f6; --accent-dim:#1e3a8a;
+    --ok:#3fb950; --bad:#f85149; --hold:#d29922;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);
+    font:14px/1.4 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    overscroll-behavior:none}
+  button{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);
+    border-radius:8px;padding:7px 11px;cursor:pointer}
+  button:hover{border-color:var(--accent)}
+  button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+  button.on{background:var(--accent-dim);border-color:var(--accent);color:#fff}
+  .hidden{display:none !important}
+
+  /* ---- login ---- */
+  #login{position:fixed;inset:0;display:grid;place-items:center}
+  #loginCard{width:min(360px,90vw);background:var(--panel);border:1px solid var(--line);
+    border-radius:14px;padding:26px}
+  #loginCard h1{margin:0 0 4px;font-size:18px}
+  #loginCard p{margin:0 0 18px;color:var(--muted);font-size:13px}
+  #loginCard label{display:block;font-size:12px;color:var(--muted);margin:12px 0 5px}
+  #loginCard input{width:100%;padding:10px;border-radius:8px;border:1px solid var(--line);
+    background:var(--bg);color:var(--ink)}
+  #loginCard .remember{display:flex;align-items:center;gap:9px;flex-direction:row;
+    font-size:13px;color:var(--ink);margin:16px 0 0;cursor:pointer}
+  #loginCard .remember input{width:auto;margin:0;accent-color:var(--accent)}
+  #loginCard button{width:100%;margin-top:18px;background:var(--accent);border-color:var(--accent);
+    color:#fff;padding:10px}
+  #loginErr{color:var(--bad);font-size:13px;min-height:18px;margin-top:10px}
+
+  button{transition:background .12s,border-color .12s,color .12s,transform .05s}
+  button:active{transform:scale(.96)}
+
+  /* ---- app ---- */
+  #app{position:fixed;inset:0;display:flex;flex-direction:column}
+  #bar{display:flex;align-items:center;gap:10px;padding:9px 12px;background:var(--panel);
+    border-bottom:1px solid var(--line);min-height:54px}
+  #bar .brand{display:flex;align-items:center;gap:9px;font-weight:600;font-size:13px;
+    color:var(--ink);white-space:nowrap}
+  #dot{width:9px;height:9px;border-radius:50%;background:var(--bad);
+    box-shadow:0 0 0 3px #f8514920;transition:background .2s,box-shadow .2s;flex:0 0 auto}
+  #dot.ok{background:var(--ok);box-shadow:0 0 0 3px #3fb95020}
+  #bar .spacer{flex:1}
+
+  /* segmented monitor switcher */
+  .seg{display:flex;background:var(--bg);border:1px solid var(--line);border-radius:11px;padding:3px;gap:2px}
+  .seg button{border:0;background:transparent;border-radius:8px;padding:6px 13px;min-width:36px;
+    color:var(--muted);font-weight:600}
+  .seg button.on{background:var(--accent);color:#fff}
+
+  /* connected button group (zoom) */
+  .group{display:flex;border:1px solid var(--line);border-radius:11px;overflow:hidden}
+  .group button{border:0;border-radius:0;background:var(--bg);padding:8px 13px;color:var(--ink);
+    min-width:42px;font-size:15px}
+  .group button+button{border-left:1px solid var(--line)}
+  .group button:active{background:var(--accent-dim)}
+
+  .iconbtn{width:44px;height:44px;border-radius:11px;display:grid;place-items:center;
+    font-size:17px;background:var(--bg);flex:0 0 auto}
+  .iconbtn.on{background:var(--accent-dim);border-color:var(--accent)}
+
+  /* dropdown menu */
+  #menu{position:absolute;top:58px;right:12px;z-index:30;width:248px;background:var(--panel);
+    border:1px solid var(--line);border-radius:16px;padding:8px;box-shadow:0 16px 48px #000b;
+    transform-origin:top right;animation:pop .12s ease-out}
+  @keyframes pop{from{opacity:0;transform:scale(.94) translateY(-4px)}to{opacity:1;transform:none}}
+  #menu .mhead{font-size:10px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);
+    padding:9px 10px 4px}
+  #menu .mrow{display:flex;align-items:center;justify-content:space-between;gap:10px;
+    padding:8px 10px;border-radius:10px;font-size:13px}
+  #menu .stat{color:var(--muted);font-variant-numeric:tabular-nums}
+  #menu hr{border:0;border-top:1px solid var(--line);margin:7px 6px}
+  .stepper{display:flex;align-items:center;gap:8px}
+  .stepper button{width:30px;height:30px;border-radius:9px;padding:0;font-size:17px;line-height:1}
+  .stepper .val{min-width:26px;text-align:center;color:var(--ink);font-variant-numeric:tabular-nums}
+  #menu .danger{width:100%;margin-top:4px;background:transparent;border-color:transparent;
+    color:var(--bad);text-align:center;padding:11px;font-weight:600}
+  #menu .danger:hover{background:#f8514915}
+
+  #stage{flex:1;position:relative;overflow:hidden;background:#000;
+    display:flex;align-items:center;justify-content:center;touch-action:none}
+  #screen{max-width:100%;max-height:100%;transform-origin:center center;
+    image-rendering:auto;cursor:crosshair}
+  #overlay{position:absolute;inset:0;display:grid;place-items:center;gap:12px;
+    color:var(--muted);background:#000;font-size:14px}
+  .spinner{width:30px;height:30px;border:3px solid var(--line);border-top-color:var(--accent);
+    border-radius:50%;animation:spin 1s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* mobile floating controls */
+  #fab{position:fixed;right:14px;bottom:18px;display:flex;flex-direction:column;gap:8px;z-index:20}
+  #fab button{width:56px;height:56px;border-radius:50%;opacity:.92;font-size:24px;
+    box-shadow:0 4px 14px #0008}
+  #fab button.on{opacity:1;background:var(--accent);border-color:var(--accent);color:#fff}
+  /* off-screen text field used only to summon the native keyboard */
+  #hiddenKbd{position:fixed;bottom:0;left:0;width:1px;height:1px;opacity:.01;
+    border:0;padding:0;background:transparent;color:transparent}
+  #toast{position:fixed;left:50%;top:16px;transform:translateX(-50%);z-index:40;
+    background:#000c;border:1px solid var(--line);border-radius:20px;padding:9px 17px;
+    font-size:13px;opacity:0;transition:opacity .3s;pointer-events:none;backdrop-filter:blur(6px)}
+  #toast.show{opacity:1}
+
+  /* keep the bar on one tidy row on small phones */
+  @media (max-width:560px){
+    #bar{gap:7px;padding:8px 10px}
+    .bname{display:none}
+    .seg button{padding:6px 11px;min-width:32px}
+    .group button{padding:8px 11px;min-width:38px}
+  }
+</style>
+</head>
+<body>
+
+<!-- ============ LOGIN ============ -->
+<section id="login">
+  <form id="loginCard" autocomplete="on">
+    <h1>Home PC</h1>
+    <p>Sign in to view and control this machine.</p>
+    <label for="u">Username</label>
+    <input id="u" name="username" autocomplete="username" autocapitalize="off" spellcheck="false">
+    <label for="p">Password</label>
+    <input id="p" name="password" type="password" autocomplete="current-password">
+    <label class="remember"><input type="checkbox" id="remember" checked> Remember me on this device</label>
+    <button id="loginBtn" type="submit">Sign in</button>
+    <div id="loginErr"></div>
+  </form>
+</section>
+
+<!-- ============ APP ============ -->
+<section id="app" class="hidden">
+  <div id="bar">
+    <div class="brand"><span id="dot"></span><span class="bname">Home PC</span></div>
+    <div class="seg" id="monBtns"></div>
+    <div class="spacer"></div>
+    <div class="group">
+      <button id="zoomOut" title="Zoom out">–</button>
+      <button id="fitBtn" title="Fit to screen">Fit</button>
+      <button id="zoomIn" title="Zoom in">+</button>
+    </div>
+    <button id="menuBtn" class="iconbtn" title="Menu" aria-haspopup="true">☰</button>
+  </div>
+
+  <div id="menu" class="hidden">
+    <div class="mhead">Display</div>
+    <div class="mrow"><span>Quality</span>
+      <div class="stepper"><button id="qDown">–</button><span class="val" id="qVal">70</span><button id="qUp">+</button></div>
+    </div>
+    <div class="mrow"><span>Frame rate</span>
+      <div class="stepper"><button id="fDown">–</button><span class="val" id="fVal">15</span><button id="fUp">+</button></div>
+    </div>
+    <hr>
+    <div class="mhead">Status</div>
+    <div class="mrow"><span>Connection</span><span class="stat" id="mState">…</span></div>
+    <div class="mrow"><span>Latency</span><span class="stat" id="mLat">– ms</span></div>
+    <div class="mrow"><span>Frames</span><span class="stat" id="mFps">0 fps</span></div>
+    <div class="mrow"><span>Screen</span><span class="stat" id="mScreen">1</span></div>
+    <hr>
+    <button id="logoutBtn" class="danger">Sign out</button>
+  </div>
+
+  <div id="stage">
+    <canvas id="screen" width="1280" height="720"></canvas>
+    <div id="overlay"><div class="spinner"></div><span>Connecting…</span></div>
+  </div>
+</section>
+
+<!-- mobile-only: tap to bring up the phone's native keyboard -->
+<div id="fab" class="hidden">
+  <button id="kbdToggle" title="Show keyboard" aria-label="Show keyboard">⌨</button>
+</div>
+<input id="hiddenKbd" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+  enterkeyhint="enter" inputmode="text">
+<div id="toast"></div>
+
+<script>
+"use strict";
+const $ = (id)=>document.getElementById(id);
+const HAS_TOUCH = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+
+/* ---------------- auth ---------------- */
+async function checkAuth(){
+  try{ const r = await fetch('/api/me'); const j = await r.json(); return j.authed; }
+  catch(e){ return false; }
+}
+/* Remember-me: prefill saved credentials from this device's local storage. */
+const CREDS_KEY='rd_creds';
+function loadCreds(){
+  try{ return JSON.parse(localStorage.getItem(CREDS_KEY)||'null'); }catch(e){ return null; }
+}
+function prefillCreds(){
+  const c=loadCreds();
+  if(c){ $('u').value=c.u||''; $('p').value=c.p||''; $('remember').checked=true; }
+}
+async function doLogin(){
+  $('loginErr').textContent = '';
+  const username=$('u').value, password=$('p').value;
+  const r = await fetch('/api/login',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({username, password})});
+  if(r.ok){
+    // save or clear remembered credentials based on the checkbox
+    if($('remember').checked){ localStorage.setItem(CREDS_KEY, JSON.stringify({u:username,p:password})); }
+    else{ localStorage.removeItem(CREDS_KEY); }
+    showApp();
+  }
+  else if(r.status===429){ $('loginErr').textContent='Too many attempts — wait a few minutes.'; }
+  else{ $('loginErr').textContent='Invalid username or password.'; }
+}
+$('loginCard').addEventListener('submit', e=>{ e.preventDefault(); doLogin(); });
+$('logoutBtn').onclick = async ()=>{
+  await fetch('/api/logout',{method:'POST'});
+  // a manual sign-out also forgets the saved credentials on this device
+  localStorage.removeItem(CREDS_KEY);
+  location.reload();
+};
+
+function showApp(){
+  $('login').classList.add('hidden');
+  $('app').classList.remove('hidden');
+  if(HAS_TOUCH){ $('fab').classList.remove('hidden'); }
+  connect();
+  if(HAS_TOUCH){
+    toast('Pinch to zoom · tap ⌨ to type');
+  }
+}
+(async ()=>{
+  if(await checkAuth()){ showApp(); return; }
+  prefillCreds();
+  if($('p').value) $('loginBtn').focus(); else $('u').focus();
+})();
+
+/* ---------------- websocket ---------------- */
+let ws=null, wantOpen=false, backoff=1000;
+const canvas=$('screen'), cctx=canvas.getContext('2d');
+let monitors=[], curMon=1;
+let framesWin=0, fpsTimer=Date.now();
+let jpegQ=70, fps=15;
+
+function connect(){
+  wantOpen=true;
+  const proto = location.protocol==='https:' ? 'wss' : 'ws';
+  ws = new WebSocket(proto+'://'+location.host+'/ws');
+  ws.binaryType='blob';
+  ws.onopen = ()=>{ backoff=1000; setConn(true); };
+  ws.onclose = ()=>{ setConn(false); if(wantOpen){ setTimeout(connect, backoff); backoff=Math.min(backoff*2,30000); } };
+  ws.onerror = ()=>{ try{ws.close();}catch(e){} };
+  ws.onmessage = onMessage;
+}
+function send(o){ if(ws && ws.readyState===1) ws.send(JSON.stringify(o)); }
+
+async function onMessage(ev){
+  if(typeof ev.data === 'string'){ handleText(JSON.parse(ev.data)); return; }
+  const blob = ev.data;
+  let bmp;
+  try{ bmp = await createImageBitmap(blob); }catch(e){ send({t:'ack'}); return; }
+  if(canvas.width!==bmp.width || canvas.height!==bmp.height){
+    canvas.width=bmp.width; canvas.height=bmp.height;
+  }
+  cctx.drawImage(bmp,0,0);
+  if(bmp.close) bmp.close();
+  $('overlay').classList.add('hidden');
+  framesWin++;
+  send({t:'ack'});
+}
+function handleText(m){
+  if(m.t==='monitors'){ monitors=m.list; curMon=m.current||1; buildMonButtons(); updateMonText(); }
+  else if(m.t==='info'){ curMon=m.mon; updateMonText(); }
+  else if(m.t==='pong'){ $('mLat').textContent = (Date.now()-m.ts)+' ms'; }
+}
+function setConn(ok){
+  $('dot').classList.toggle('ok',ok);
+  $('mState').textContent = ok?'Connected':'Reconnecting…';
+  if(!ok) $('overlay').classList.remove('hidden');
+}
+setInterval(()=>{ send({t:'ping',ts:Date.now()}); }, 5000);
+setInterval(()=>{
+  const dt=(Date.now()-fpsTimer)/1000; $('mFps').textContent=Math.round(framesWin/dt)+' fps';
+  framesWin=0; fpsTimer=Date.now();
+}, 1000);
+
+/* ---------------- monitors ---------------- */
+function buildMonButtons(){
+  const c=$('monBtns'); c.innerHTML='';
+  monitors.forEach(mo=>{
+    const b=document.createElement('button');
+    b.className='mon'+(mo.index===curMon?' on':''); b.textContent=mo.index;
+    b.title='Screen '+mo.index+' ('+mo.width+'×'+mo.height+')';
+    b.onclick=()=>switchMon(mo.index);
+    c.appendChild(b);
+  });
+}
+function switchMon(i){
+  if(i<1) i=monitors.length; if(i>monitors.length) i=1;
+  curMon=i; send({t:'mon',i});
+  [...$('monBtns').children].forEach(b=>b.classList.toggle('on', +b.textContent===i));
+  resetZoom(); updateMonText();
+}
+function updateMonText(){ $('mScreen').textContent=curMon; }
+
+/* ---------------- zoom / pan ---------------- */
+const MAX_ZOOM=8;
+let scale=1, panX=0, panY=0;
+function applyTransform(){ canvas.style.transform=`translate(${panX}px,${panY}px) scale(${scale})`; }
+function clampPan(){
+  const st=$('stage').getBoundingClientRect();
+  const mx=(scale-1)*st.width/2, my=(scale-1)*st.height/2;
+  panX=Math.min(mx,Math.max(-mx,panX));
+  panY=Math.min(my,Math.max(-my,panY));
+}
+function resetZoom(){ scale=1; panX=0; panY=0; applyTransform(); }
+/* Zoom by `factor`, keeping the point (fx,fy) under the fingers fixed. */
+function zoomAt(fx,fy,factor){
+  const st=$('stage').getBoundingClientRect();
+  const cx=st.left+st.width/2, cy=st.top+st.height/2;
+  const ns=Math.min(MAX_ZOOM,Math.max(1,scale*factor));
+  const k=ns/scale;
+  panX += (fx-(cx+panX))*(1-k);
+  panY += (fy-(cy+panY))*(1-k);
+  scale=ns;
+  if(scale<=1){ panX=0; panY=0; } else clampPan();
+  applyTransform();
+}
+function zoomBy(factor){
+  const st=$('stage').getBoundingClientRect();
+  zoomAt(st.left+st.width/2, st.top+st.height/2, factor);
+  toast(scale>1 ? ('Zoom '+scale.toFixed(1)+'×') : 'Fit');
+}
+$('fitBtn').onclick=()=>{ resetZoom(); toast('Fit'); };
+$('zoomIn').onclick=()=>zoomBy(1.4);
+$('zoomOut').onclick=()=>zoomBy(1/1.4);
+
+/* map a client point to normalized (0..1) coords inside the current monitor.
+   getBoundingClientRect already includes the CSS transform, so this stays
+   correct at any zoom/pan. */
+function norm(clientX, clientY){
+  const r=canvas.getBoundingClientRect();
+  let nx=(clientX-r.left)/r.width, ny=(clientY-r.top)/r.height;
+  return {x:Math.min(Math.max(nx,0),1), y:Math.min(Math.max(ny,0),1)};
+}
+
+/* ---------------- quality / fps ---------------- */
+function pushQ(){ $('qVal').textContent=jpegQ; $('fVal').textContent=fps; send({t:'q',jpeg:jpegQ,fps:fps}); }
+$('qUp').onclick=()=>{ jpegQ=Math.min(95,jpegQ+5); pushQ(); };
+$('qDown').onclick=()=>{ jpegQ=Math.max(20,jpegQ-5); pushQ(); };
+$('fUp').onclick=()=>{ fps=Math.min(30,fps+5); pushQ(); };
+$('fDown').onclick=()=>{ fps=Math.max(1,fps-5); pushQ(); };
+
+/* ---------------- menu ---------------- */
+const menu=$('menu'), menuBtn=$('menuBtn');
+function closeMenu(){ menu.classList.add('hidden'); menuBtn.classList.remove('on'); }
+menuBtn.onclick=(e)=>{
+  e.stopPropagation();
+  const open=menu.classList.toggle('hidden');
+  menuBtn.classList.toggle('on', !open);
+};
+document.addEventListener('click', e=>{
+  if(!menu.classList.contains('hidden') && !menu.contains(e.target) && e.target!==menuBtn) closeMenu();
+});
+
+/* ---------------- modifier indicators ---------------- */
+const heldMods=new Set();
+function setModUI(){ /* modifier chips were removed from the UI; nothing to update */ }
+function trackMod(code,down){
+  const map={ShiftLeft:'Shift',ShiftRight:'Shift',ControlLeft:'Control',ControlRight:'Control',
+    AltLeft:'Alt',AltRight:'Alt',MetaLeft:'Meta',MetaRight:'Meta'};
+  const m=map[code]; if(!m) return;
+  if(down) heldMods.add(m); else heldMods.delete(m);
+  setModUI();
+}
+
+/* ============================================================= DESKTOP */
+if(!HAS_TOUCH){
+  let lastMove=0;
+  canvas.addEventListener('mousemove', e=>{
+    const now=performance.now(); if(now-lastMove<30) return; lastMove=now;
+    const p=norm(e.clientX,e.clientY); send({t:'m',x:p.x,y:p.y});
+  });
+  const BTN={0:'left',1:'middle',2:'right'};
+  canvas.addEventListener('mousedown', e=>{
+    e.preventDefault(); const p=norm(e.clientX,e.clientY);
+    send({t:'d',b:BTN[e.button]||'left',x:p.x,y:p.y});
+  });
+  window.addEventListener('mouseup', e=>{
+    const p=norm(e.clientX,e.clientY); send({t:'u',b:BTN[e.button]||'left',x:p.x,y:p.y});
+  });
+  canvas.addEventListener('contextmenu', e=>e.preventDefault());
+  canvas.addEventListener('wheel', e=>{
+    e.preventDefault(); send({t:'s',dy:e.deltaY,dx:e.deltaX});
+  },{passive:false});
+
+  document.addEventListener('keydown', e=>{
+    if($('app').classList.contains('hidden')) return;
+    e.preventDefault(); trackMod(e.code,true); send({t:'k',code:e.code,down:true});
+  });
+  document.addEventListener('keyup', e=>{
+    if($('app').classList.contains('hidden')) return;
+    e.preventDefault(); trackMod(e.code,false); send({t:'k',code:e.code,down:false});
+  });
+}
+
+/* ============================================================= MOBILE */
+if(HAS_TOUCH){
+  let startTouch=null, longTimer=null, dragging=false, consumed=false, moved=false;
+  let lastTap=0, lastSend=0;
+  // two-finger state
+  let multi=false, lastDist=0, lastMid=null;
+
+  function dist(t){ const dx=t[0].clientX-t[1].clientX, dy=t[0].clientY-t[1].clientY; return Math.hypot(dx,dy); }
+  function mid(t){ return {x:(t[0].clientX+t[1].clientX)/2, y:(t[0].clientY+t[1].clientY)/2}; }
+
+  canvas.addEventListener('touchstart', e=>{
+    e.preventDefault();
+    if(e.touches.length===1 && !multi){
+      const t=e.touches[0]; startTouch={x:t.clientX,y:t.clientY,time:Date.now()};
+      moved=false; dragging=false; consumed=false;
+      longTimer=setTimeout(()=>{
+        if(!moved){ const p=norm(startTouch.x,startTouch.y);
+          send({t:'d',b:'right',x:p.x,y:p.y}); send({t:'u',b:'right',x:p.x,y:p.y});
+          consumed=true; }
+      },500);
+    } else if(e.touches.length===2){
+      multi=true; clearTimeout(longTimer);
+      if(dragging){ const p=norm(startTouch.x,startTouch.y); send({t:'u',b:'left',x:p.x,y:p.y}); dragging=false; }
+      lastDist=dist(e.touches); lastMid=mid(e.touches);
+    }
+  },{passive:false});
+
+  canvas.addEventListener('touchmove', e=>{
+    e.preventDefault();
+    if(multi && e.touches.length===2){
+      const d=dist(e.touches), mp=mid(e.touches);
+      // Pinch zoom: respond immediately to any change in finger distance,
+      // centered on the midpoint between the fingers.
+      if(lastDist>0 && Math.abs(d-lastDist)>0.1){
+        zoomAt(mp.x, mp.y, d/lastDist);
+      }
+      // Two-finger drag: pan the view when zoomed in; otherwise scroll the host.
+      if(scale>1){
+        panX+=mp.x-lastMid.x; panY+=mp.y-lastMid.y; clampPan(); applyTransform();
+      } else {
+        const dy=mp.y-lastMid.y; if(Math.abs(dy)>1) send({t:'s',dy:-dy*3,dx:0});
+      }
+      lastDist=d; lastMid=mp;
+      return;
+    }
+    if(e.touches.length===1 && !multi && startTouch){
+      const t=e.touches[0];
+      if(!moved && Math.hypot(t.clientX-startTouch.x,t.clientY-startTouch.y)>10){
+        moved=true; clearTimeout(longTimer);
+        if(!consumed){ const p=norm(startTouch.x,startTouch.y); send({t:'d',b:'left',x:p.x,y:p.y}); dragging=true; }
+      }
+      if(dragging){
+        const now=performance.now(); if(now-lastSend<25) return; lastSend=now;
+        const p=norm(t.clientX,t.clientY); send({t:'m',x:p.x,y:p.y});
+      }
+    }
+  },{passive:false});
+
+  canvas.addEventListener('touchend', e=>{
+    e.preventDefault();
+    if(multi){
+      // stay in multi-touch mode until every finger is lifted, so releasing one
+      // finger mid-pinch doesn't trigger a stray click
+      if(e.touches.length===0){ multi=false; }
+      return;
+    }
+    clearTimeout(longTimer);
+    if(consumed){ startTouch=null; return; }
+    if(dragging){ const t=e.changedTouches[0]; const p=norm(t.clientX,t.clientY);
+      send({t:'u',b:'left',x:p.x,y:p.y}); dragging=false; startTouch=null; return; }
+    if(startTouch && !moved){
+      const t=e.changedTouches[0]; const p=norm(t.clientX,t.clientY); const now=Date.now();
+      if(now-lastTap<300){ send({t:'dc',b:'left',x:p.x,y:p.y}); lastTap=0; }
+      else { send({t:'d',b:'left',x:p.x,y:p.y}); send({t:'u',b:'left',x:p.x,y:p.y}); lastTap=now; }
+    }
+    startTouch=null;
+  },{passive:false});
+
+  /* Native keyboard: tapping ⌨ focuses an off-screen field, which makes the
+     phone slide up its real keyboard. Typed text is forwarded to the host. */
+  const hk=$('hiddenKbd');
+  $('kbdToggle').onclick=()=>{
+    if(document.activeElement===hk){ hk.blur(); }
+    else { hk.value=''; hk.focus(); }
+  };
+  hk.addEventListener('focus', ()=>$('kbdToggle').classList.add('on'));
+  hk.addEventListener('blur',  ()=>$('kbdToggle').classList.remove('on'));
+  hk.addEventListener('input', e=>{
+    const v=hk.value; if(v){ send({t:'type',text:v}); hk.value=''; }
+  });
+  hk.addEventListener('beforeinput', e=>{
+    if(e.inputType==='deleteContentBackward'){ tapKey('Backspace'); e.preventDefault(); }
+    else if(e.inputType==='insertLineBreak' || e.inputType==='insertParagraph'){ tapKey('Enter'); e.preventDefault(); }
+  });
+
+  /* used by the native keyboard's Backspace / Enter handling above */
+  function tapKey(code){ send({t:'k',code,down:true}); send({t:'k',code,down:false}); }
+}
+
+/* ---------------- toast ---------------- */
+let toastTimer=null;
+function toast(msg){
+  const t=$('toast'); t.textContent=msg; t.classList.add('show');
+  clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove('show'),2600);
+}
+</script>
+</body>
+</html>
