@@ -160,6 +160,7 @@
     <div class="mrow"><span>Frame rate</span>
       <div class="stepper"><button id="fDown">–</button><span class="val" id="fVal">30</span><button id="fUp">+</button></div>
     </div>
+    <div class="mrow act" id="autoNetRow"><span>Auto frame rate</span><span class="stat" id="autoNetState">On</span></div>
     <hr>
     <div class="mhead">Actions</div>
     <div class="mrow act" id="refreshRow"><span>Refresh page</span><span class="stat">Ctrl R</span></div>
@@ -252,6 +253,7 @@ const canvas=$('screen'), cctx=canvas.getContext('2d');
 let monitors=[], curMon=1, curSource='screen';
 let framesWin=0, fpsTimer=Date.now();
 let jpegQ=70, fps=30;
+let autoNet=true, latEma=0;   // adapt fps/quality to measured ping
 
 function connect(){
   wantOpen=true;
@@ -282,7 +284,11 @@ async function onMessage(ev){
 function handleText(m){
   if(m.t==='monitors'){ monitors=m.list; curMon=m.current||1; buildMonButtons(); updateMonText(); }
   else if(m.t==='info'){ if(m.mon==='cam'){ curSource='cam'; } else { curSource='screen'; curMon=m.mon; } markActive(); updateMonText(); }
-  else if(m.t==='pong'){ $('mLat').textContent = (Date.now()-m.ts)+' ms'; }
+  else if(m.t==='pong'){
+    const lat=Date.now()-m.ts; $('mLat').textContent = lat+' ms';
+    latEma = latEma ? Math.round(latEma*0.6 + lat*0.4) : lat;
+    adaptNet();
+  }
 }
 function setConn(ok){
   $('dot').classList.toggle('ok',ok);
@@ -372,10 +378,30 @@ function norm(clientX, clientY){
 
 /* ---------------- quality / fps ---------------- */
 function pushQ(){ $('qVal').textContent=jpegQ; $('fVal').textContent=fps; send({t:'q',jpeg:jpegQ,fps:fps}); }
-$('qUp').onclick=()=>{ jpegQ=Math.min(95,jpegQ+5); pushQ(); };
-$('qDown').onclick=()=>{ jpegQ=Math.max(20,jpegQ-5); pushQ(); };
-$('fUp').onclick=()=>{ fps=Math.min(30,fps+5); pushQ(); };
-$('fDown').onclick=()=>{ fps=Math.max(1,fps-5); pushQ(); };
+function manual(){ if(autoNet) setAutoNet(false); }   // a manual tweak turns auto off
+$('qUp').onclick=()=>{ manual(); jpegQ=Math.min(95,jpegQ+5); pushQ(); };
+$('qDown').onclick=()=>{ manual(); jpegQ=Math.max(20,jpegQ-5); pushQ(); };
+$('fUp').onclick=()=>{ manual(); fps=Math.min(30,fps+5); pushQ(); };
+$('fDown').onclick=()=>{ manual(); fps=Math.max(1,fps-5); pushQ(); };
+
+/* Adapt frame rate + quality to measured ping. Tuned so normal tunnel latency
+   stays at 30fps and it only steps down when ping is genuinely bad. */
+function tierFor(lat){
+  if(lat < 250) return {fps:30, q:70};
+  if(lat < 450) return {fps:20, q:60};
+  if(lat < 700) return {fps:12, q:50};
+  return {fps:6, q:45};
+}
+function adaptNet(){
+  if(!autoNet) return;
+  const t=tierFor(latEma);
+  if(t.fps!==fps || t.q!==jpegQ){ fps=t.fps; jpegQ=t.q; pushQ(); }
+}
+function setAutoNet(on){
+  autoNet=on; $('autoNetState').textContent = on?'On':'Off';
+  if(on) adaptNet();
+}
+$('autoNetRow').onclick=()=>setAutoNet(!autoNet);
 
 /* ---------------- menu ---------------- */
 const menu=$('menu'), menuBtn=$('menuBtn');
