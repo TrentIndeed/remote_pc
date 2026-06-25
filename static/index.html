@@ -158,7 +158,7 @@
       <div class="stepper"><button id="qDown">–</button><span class="val" id="qVal">70</span><button id="qUp">+</button></div>
     </div>
     <div class="mrow"><span>Frame rate</span>
-      <div class="stepper"><button id="fDown">–</button><span class="val" id="fVal">15</span><button id="fUp">+</button></div>
+      <div class="stepper"><button id="fDown">–</button><span class="val" id="fVal">30</span><button id="fUp">+</button></div>
     </div>
     <hr>
     <div class="mhead">Actions</div>
@@ -251,7 +251,7 @@ let ws=null, wantOpen=false, backoff=1000;
 const canvas=$('screen'), cctx=canvas.getContext('2d');
 let monitors=[], curMon=1, curSource='screen';
 let framesWin=0, fpsTimer=Date.now();
-let jpegQ=70, fps=15;
+let jpegQ=70, fps=30;
 
 function connect(){
   wantOpen=true;
@@ -438,8 +438,11 @@ function trackMod(code,down){
   setModUI();
 }
 
-/* ============================================================= DESKTOP */
-if(!HAS_TOUCH){
+/* ===================== MOUSE + KEYBOARD (any device) =====================
+   Attached unconditionally so a mouse / trackpad / keyboard works even on a
+   touch-capable laptop. On phones the touch handlers (below) call preventDefault,
+   which suppresses synthetic mouse events, so these never double-fire from taps. */
+{
   let lastMove=0;
   canvas.addEventListener('mousemove', e=>{
     const now=performance.now(); if(now-lastMove<30) return; lastMove=now;
@@ -465,10 +468,12 @@ if(!HAS_TOUCH){
 
   document.addEventListener('keydown', e=>{
     if($('app').classList.contains('hidden')) return;
+    if(document.activeElement && document.activeElement.id==='hiddenKbd') return;  // on-screen kbd handles its own input
     e.preventDefault(); trackMod(e.code,true); send({t:'k',code:e.code,down:true});
   });
   document.addEventListener('keyup', e=>{
     if($('app').classList.contains('hidden')) return;
+    if(document.activeElement && document.activeElement.id==='hiddenKbd') return;
     e.preventDefault(); trackMod(e.code,false); send({t:'k',code:e.code,down:false});
   });
 }

@@ -135,7 +135,7 @@ verification you plan to add.
 | `RD_USERNAME` | `admin` | Login username |
 | `RD_PORT` | `8080` | Local server port |
 | `RD_JPEG_QUALITY` | `70` | 1–100; lower = less bandwidth |
-| `RD_TARGET_FPS` | `15` | Max frame rate (static screens send fewer) |
+| `RD_TARGET_FPS` | `30` | Max frame rate (static screens send fewer) |
 | `RD_SESSION_TTL` | `28800` | Session lifetime, seconds (8h) |
 | `RD_SECRET` | random | **Set a stable value to keep sessions valid across restarts.** Sessions are stateless HMAC-signed tokens keyed by this; if it changes, everyone is logged out. `secrets.local.ps1` sets it. |
 | `RD_TELEGRAM_TOKEN` | — | Telegram bot token for login notifications (optional) |

@@ -62,7 +62,7 @@ class Config:
 
     # --- video ---
     JPEG_QUALITY = _int("RD_JPEG_QUALITY", 70)     # 1-100
-    TARGET_FPS = _int("RD_TARGET_FPS", 15)         # cap; static screens send less
+    TARGET_FPS = _int("RD_TARGET_FPS", 30)         # cap; static screens send less
     # Frames whose downsampled signature is unchanged are skipped (saves
     # bandwidth while watching a mostly-static pipeline). A keepalive frame is
     # still sent every KEEPALIVE_SECONDS.
