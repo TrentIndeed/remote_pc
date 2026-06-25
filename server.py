@@ -155,6 +155,28 @@ async def logout(request: Request):
     return resp
 
 
+@app.post("/api/reboot")
+async def reboot(request: Request):
+    """Reboot the host -- remote recovery from input-freeze / lockouts. Needs no
+    admin; auto-login + the startup watchdog bring everything back."""
+    if not _origin_allowed(request):
+        return JSONResponse({"error": "Bad origin"}, status_code=403)
+    if not auth.validate_token(request.cookies.get(config.COOKIE_NAME)):
+        return JSONResponse({"error": "unauthorized"}, status_code=401)
+    if not config.ALLOW_REBOOT:
+        return JSONResponse({"error": "Reboot disabled"}, status_code=403)
+    notify.send("\U0001f504 Remote desktop: reboot requested from %s" % _client_ip(request))
+    try:
+        import subprocess
+        if sys.platform.startswith("win"):
+            subprocess.Popen(["shutdown", "/r", "/t", "5", "/f"])
+        else:
+            subprocess.Popen(["shutdown", "-r", "now"])
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+    return JSONResponse({"ok": True})
+
+
 # --------------------------------------------------------------------------- #
 # Per-connection shared state between the async loop and the capture thread
 # --------------------------------------------------------------------------- #

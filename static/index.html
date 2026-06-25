@@ -81,6 +81,7 @@
   #menu .mrow.act{cursor:pointer}
   #menu .mrow.act:hover,#menu .mrow.act:active{background:var(--bg)}
   #menu .mrow.act .stat{color:var(--accent)}
+  #menu #rebootRow .stat{color:var(--bad)}
   #menu hr{border:0;border-top:1px solid var(--line);margin:7px 6px}
   .stepper{display:flex;align-items:center;gap:8px}
   .stepper button{width:30px;height:30px;border-radius:9px;padding:0;font-size:17px;line-height:1}
@@ -167,6 +168,7 @@
     <div class="mrow act" id="hardRefreshRow"><span>Hard refresh page</span><span class="stat">Ctrl ⇧ R</span></div>
     <div class="mrow act" id="reloadViewerRow"><span>Reload viewer</span><span class="stat">↻</span></div>
     <div class="mrow act" id="audioRow"><span>Audio (system)</span><span class="stat" id="audioState">Off</span></div>
+    <div class="mrow act" id="rebootRow"><span>Reboot PC</span><span class="stat">⏻</span></div>
     <hr>
     <div class="mhead">Status</div>
     <div class="mrow"><span>Connection</span><span class="stat" id="mState">…</span></div>
@@ -424,6 +426,11 @@ function sendCombo(codes){
 $('refreshRow').onclick     =()=>{ sendCombo(['ControlLeft','KeyR']); closeMenu(); toast('Sent refresh'); };
 $('hardRefreshRow').onclick =()=>{ sendCombo(['ControlLeft','ShiftLeft','KeyR']); closeMenu(); toast('Sent hard refresh'); };
 $('reloadViewerRow').onclick=()=>{ location.reload(); };
+$('rebootRow').onclick=()=>{
+  if(!confirm('Reboot the home PC now? Open apps close; it should be back in ~1–2 min.')) return;
+  closeMenu(); toast('Rebooting…');
+  fetch('/api/reboot',{method:'POST'}).then(r=>{ if(!r.ok) toast('Reboot failed ('+r.status+')'); }).catch(()=>toast('Reboot failed'));
+};
 
 /* ---------------- optional system audio (Web Audio playback of streamed PCM) -- */
 let actx=null, aws=null, aRate=48000, playTime=0, audioOn=false;
