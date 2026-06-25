@@ -185,6 +185,7 @@
 
 <!-- mobile-only: tap to bring up the phone's native keyboard -->
 <div id="fab" class="hidden">
+  <button id="modeToggle" title="Scroll / drag mode" aria-label="Scroll or drag mode">↕</button>
   <button id="kbdToggle" title="Show keyboard" aria-label="Show keyboard">⌨</button>
 </div>
 <input id="hiddenKbd" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
@@ -238,7 +239,7 @@ function showApp(){
   if(HAS_TOUCH){ $('fab').classList.remove('hidden'); }
   connect();
   if(HAS_TOUCH){
-    toast('Pinch to zoom · tap ⌨ to type');
+    toast('Swipe to scroll · pinch to zoom · ↕ for drag mode');
   }
 }
 (async ()=>{
@@ -510,6 +511,8 @@ if(HAS_TOUCH){
   let lastTap=0, lastSend=0;
   // two-finger state
   let multi=false, lastDist=0, lastMid=null, startDist=0, startMid=null, gmode=null, scrollAcc=0;
+  // one-finger state: default is SCROLL (swipe to scroll the host); toggle to DRAG
+  let touchMode='scroll', lastX=0, lastY=0, scroll1=0;
   const GZONE=24;          // px deadzone before a 2-finger gesture is classified
   const SCROLL_STEP=16;    // px of finger travel per one scroll "click"
 
@@ -520,6 +523,7 @@ if(HAS_TOUCH){
     e.preventDefault();
     if(e.touches.length===1 && !multi){
       const t=e.touches[0]; startTouch={x:t.clientX,y:t.clientY,time:Date.now()};
+      lastX=t.clientX; lastY=t.clientY; scroll1=0;
       moved=false; dragging=false; consumed=false;
       longTimer=setTimeout(()=>{
         if(!moved){ const p=norm(startTouch.x,startTouch.y);
@@ -565,12 +569,23 @@ if(HAS_TOUCH){
       const t=e.touches[0];
       if(!moved && Math.hypot(t.clientX-startTouch.x,t.clientY-startTouch.y)>10){
         moved=true; clearTimeout(longTimer);
-        if(!consumed){ const p=norm(startTouch.x,startTouch.y); send({t:'d',b:'left',x:p.x,y:p.y}); dragging=true; }
+        // drag mode: begin a held-button drag at the start point
+        if(touchMode==='drag' && !consumed){ const p=norm(startTouch.x,startTouch.y); send({t:'d',b:'left',x:p.x,y:p.y}); dragging=true; }
       }
-      if(dragging){
-        const now=performance.now(); if(now-lastSend<25) return; lastSend=now;
-        const p=norm(t.clientX,t.clientY); send({t:'m',x:p.x,y:p.y});
+      if(moved && !consumed){
+        if(touchMode==='scroll'){
+          // one finger swipe -> scroll the host (paced; finger down = scroll up)
+          scroll1 += (t.clientY - lastY);
+          while(Math.abs(scroll1) >= SCROLL_STEP){
+            const dir = scroll1>0 ? 1 : -1;
+            send({t:'s', dy:-dir, dx:0});
+            scroll1 -= dir*SCROLL_STEP;
+          }
+        } else if(dragging){
+          const now=performance.now(); if(now-lastSend>=25){ lastSend=now; const p=norm(t.clientX,t.clientY); send({t:'m',x:p.x,y:p.y}); }
+        }
       }
+      lastX=t.clientX; lastY=t.clientY;
     }
   },{passive:false});
 
@@ -600,6 +615,14 @@ if(HAS_TOUCH){
   $('kbdToggle').onclick=()=>{
     if(document.activeElement===hk){ hk.blur(); }
     else { hk.value=''; hk.focus(); }
+  };
+
+  // one-finger mode: scroll (default) vs drag/select
+  $('modeToggle').onclick=()=>{
+    touchMode = touchMode==='scroll' ? 'drag' : 'scroll';
+    $('modeToggle').textContent = touchMode==='scroll' ? '↕' : '✥';
+    $('modeToggle').classList.toggle('on', touchMode==='drag');
+    toast(touchMode==='scroll' ? 'Scroll mode — one finger scrolls' : 'Drag mode — one finger drags/selects');
   };
   hk.addEventListener('focus', ()=>$('kbdToggle').classList.add('on'));
   hk.addEventListener('blur',  ()=>$('kbdToggle').classList.remove('on'));
