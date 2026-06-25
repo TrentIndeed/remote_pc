@@ -20,6 +20,11 @@ from urllib.parse import urlparse
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+# NOTE: deliberately NOT making the process DPI-aware. This machine runs at 100%
+# scaling (virtual-screen metrics are identical either way), and enabling
+# Per-Monitor-V2 awareness was found to break the SendInput absolute mouse move
+# (cursor stopped tracking entirely). The non-aware path positions exactly.
+
 import uvicorn
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse, FileResponse, Response
