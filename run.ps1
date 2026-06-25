@@ -23,7 +23,8 @@ if (-not ($env:RD_PASSWORD_HASH -or $env:RD_PASSWORD)) {
 function Test-PortFree([int]$p) {
     -not (Get-NetTCPConnection -LocalPort $p -State Listen -ErrorAction SilentlyContinue)
 }
-$port = [int]$(if ($env:RD_PORT) { $env:RD_PORT } else { 8080 })
+# Default to 8090: port 8080 is used by another service on this machine.
+$port = [int]$(if ($env:RD_PORT) { $env:RD_PORT } else { 8090 })
 while (-not (Test-PortFree $port)) {
     Write-Host "Port $port is in use, trying $($port + 1) ..."
     $port++

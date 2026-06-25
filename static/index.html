@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
-<title>Home PC</title>
+<title>vscode</title>
 <style>
   :root{
     --bg:#0d1117; --panel:#161b22; --line:#272e3a; --ink:#e6edf3;
@@ -78,6 +78,9 @@
   #menu .mrow{display:flex;align-items:center;justify-content:space-between;gap:10px;
     padding:8px 10px;border-radius:10px;font-size:13px}
   #menu .stat{color:var(--muted);font-variant-numeric:tabular-nums}
+  #menu .mrow.act{cursor:pointer}
+  #menu .mrow.act:hover,#menu .mrow.act:active{background:var(--bg)}
+  #menu .mrow.act .stat{color:var(--accent)}
   #menu hr{border:0;border-top:1px solid var(--line);margin:7px 6px}
   .stepper{display:flex;align-items:center;gap:8px}
   .stepper button{width:30px;height:30px;border-radius:9px;padding:0;font-size:17px;line-height:1}
@@ -123,7 +126,7 @@
 <!-- ============ LOGIN ============ -->
 <section id="login">
   <form id="loginCard" autocomplete="on">
-    <h1>Home PC</h1>
+    <h1>vscode</h1>
     <p>Sign in to view and control this machine.</p>
     <label for="u">Username</label>
     <input id="u" name="username" autocomplete="username" autocapitalize="off" spellcheck="false">
@@ -138,7 +141,7 @@
 <!-- ============ APP ============ -->
 <section id="app" class="hidden">
   <div id="bar">
-    <div class="brand"><span id="dot"></span><span class="bname">Home PC</span></div>
+    <div class="brand"><span id="dot"></span><span class="bname">vscode</span></div>
     <div class="seg" id="monBtns"></div>
     <div class="spacer"></div>
     <div class="group">
@@ -157,6 +160,11 @@
     <div class="mrow"><span>Frame rate</span>
       <div class="stepper"><button id="fDown">–</button><span class="val" id="fVal">15</span><button id="fUp">+</button></div>
     </div>
+    <hr>
+    <div class="mhead">Actions</div>
+    <div class="mrow act" id="refreshRow"><span>Refresh page</span><span class="stat">Ctrl R</span></div>
+    <div class="mrow act" id="hardRefreshRow"><span>Hard refresh page</span><span class="stat">Ctrl ⇧ R</span></div>
+    <div class="mrow act" id="reloadViewerRow"><span>Reload viewer</span><span class="stat">↻</span></div>
     <hr>
     <div class="mhead">Status</div>
     <div class="mrow"><span>Connection</span><span class="stat" id="mState">…</span></div>
@@ -240,7 +248,7 @@ function showApp(){
 /* ---------------- websocket ---------------- */
 let ws=null, wantOpen=false, backoff=1000;
 const canvas=$('screen'), cctx=canvas.getContext('2d');
-let monitors=[], curMon=1;
+let monitors=[], curMon=1, curSource='screen';
 let framesWin=0, fpsTimer=Date.now();
 let jpegQ=70, fps=15;
 
@@ -272,7 +280,7 @@ async function onMessage(ev){
 }
 function handleText(m){
   if(m.t==='monitors'){ monitors=m.list; curMon=m.current||1; buildMonButtons(); updateMonText(); }
-  else if(m.t==='info'){ curMon=m.mon; updateMonText(); }
+  else if(m.t==='info'){ if(m.mon==='cam'){ curSource='cam'; } else { curSource='screen'; curMon=m.mon; } markActive(); updateMonText(); }
   else if(m.t==='pong'){ $('mLat').textContent = (Date.now()-m.ts)+' ms'; }
 }
 function setConn(ok){
@@ -286,24 +294,39 @@ setInterval(()=>{
   framesWin=0; fpsTimer=Date.now();
 }, 1000);
 
-/* ---------------- monitors ---------------- */
+/* ---------------- monitors + webcam ---------------- */
 function buildMonButtons(){
   const c=$('monBtns'); c.innerHTML='';
   monitors.forEach(mo=>{
     const b=document.createElement('button');
-    b.className='mon'+(mo.index===curMon?' on':''); b.textContent=mo.index;
+    b.className='mon'+(curSource!=='cam' && mo.index===curMon?' on':''); b.textContent=mo.index;
     b.title='Screen '+mo.index+' ('+mo.width+'×'+mo.height+')';
     b.onclick=()=>switchMon(mo.index);
     c.appendChild(b);
   });
+  // fourth button: home-PC webcam
+  const cam=document.createElement('button');
+  cam.className='mon cam'+(curSource==='cam'?' on':''); cam.textContent='📷';
+  cam.title='Home PC webcam';
+  cam.onclick=selectCam;
+  c.appendChild(cam);
+}
+function markActive(){
+  [...$('monBtns').children].forEach(b=>{
+    if(b.classList.contains('cam')) b.classList.toggle('on', curSource==='cam');
+    else b.classList.toggle('on', curSource!=='cam' && +b.textContent===curMon);
+  });
 }
 function switchMon(i){
   if(i<1) i=monitors.length; if(i>monitors.length) i=1;
-  curMon=i; send({t:'mon',i});
-  [...$('monBtns').children].forEach(b=>b.classList.toggle('on', +b.textContent===i));
-  resetZoom(); updateMonText();
+  curSource='screen'; curMon=i; send({t:'mon',i});
+  markActive(); resetZoom(); updateMonText();
 }
-function updateMonText(){ $('mScreen').textContent=curMon; }
+function selectCam(){
+  curSource='cam'; send({t:'cam'});
+  markActive(); resetZoom(); updateMonText();
+}
+function updateMonText(){ $('mScreen').textContent = curSource==='cam' ? 'Webcam' : curMon; }
 
 /* ---------------- zoom / pan ---------------- */
 const MAX_ZOOM=8;
@@ -365,6 +388,15 @@ document.addEventListener('click', e=>{
   if(!menu.classList.contains('hidden') && !menu.contains(e.target) && e.target!==menuBtn) closeMenu();
 });
 
+/* ---------------- actions: send a key combo to the host, reload the viewer ---- */
+function sendCombo(codes){
+  codes.forEach(c=>send({t:'k',code:c,down:true}));
+  codes.slice().reverse().forEach(c=>send({t:'k',code:c,down:false}));
+}
+$('refreshRow').onclick     =()=>{ sendCombo(['ControlLeft','KeyR']); closeMenu(); toast('Sent refresh'); };
+$('hardRefreshRow').onclick =()=>{ sendCombo(['ControlLeft','ShiftLeft','KeyR']); closeMenu(); toast('Sent hard refresh'); };
+$('reloadViewerRow').onclick=()=>{ location.reload(); };
+
 /* ---------------- modifier indicators ---------------- */
 const heldMods=new Set();
 function setModUI(){ /* modifier chips were removed from the UI; nothing to update */ }
@@ -393,7 +425,12 @@ if(!HAS_TOUCH){
   });
   canvas.addEventListener('contextmenu', e=>e.preventDefault());
   canvas.addEventListener('wheel', e=>{
-    e.preventDefault(); send({t:'s',dy:e.deltaY,dx:e.deltaX});
+    e.preventDefault();
+    // Browsers report deltaY in pixels (~100/notch) or lines; the host scrolls
+    // by "clicks", so collapse a notch to ~1-3 clicks instead of ~100 lines.
+    const unit = e.deltaMode===0 ? 100 : 1;   // 0=pixels, 1=lines
+    const clk = v => v===0 ? 0 : Math.sign(v)*Math.min(3, Math.max(1, Math.round(Math.abs(v)/unit)));
+    send({t:'s', dy: clk(e.deltaY), dx: clk(e.deltaX)});
   },{passive:false});
 
   document.addEventListener('keydown', e=>{
@@ -411,7 +448,9 @@ if(HAS_TOUCH){
   let startTouch=null, longTimer=null, dragging=false, consumed=false, moved=false;
   let lastTap=0, lastSend=0;
   // two-finger state
-  let multi=false, lastDist=0, lastMid=null;
+  let multi=false, lastDist=0, lastMid=null, startDist=0, startMid=null, gmode=null, scrollAcc=0;
+  const GZONE=24;          // px deadzone before a 2-finger gesture is classified
+  const SCROLL_STEP=16;    // px of finger travel per one scroll "click"
 
   function dist(t){ const dx=t[0].clientX-t[1].clientX, dy=t[0].clientY-t[1].clientY; return Math.hypot(dx,dy); }
   function mid(t){ return {x:(t[0].clientX+t[1].clientX)/2, y:(t[0].clientY+t[1].clientY)/2}; }
@@ -429,7 +468,8 @@ if(HAS_TOUCH){
     } else if(e.touches.length===2){
       multi=true; clearTimeout(longTimer);
       if(dragging){ const p=norm(startTouch.x,startTouch.y); send({t:'u',b:'left',x:p.x,y:p.y}); dragging=false; }
-      lastDist=dist(e.touches); lastMid=mid(e.touches);
+      startDist=lastDist=dist(e.touches); startMid=lastMid=mid(e.touches);
+      gmode=null; scrollAcc=0;
     }
   },{passive:false});
 
@@ -437,16 +477,25 @@ if(HAS_TOUCH){
     e.preventDefault();
     if(multi && e.touches.length===2){
       const d=dist(e.touches), mp=mid(e.touches);
-      // Pinch zoom: respond immediately to any change in finger distance,
-      // centered on the midpoint between the fingers.
-      if(lastDist>0 && Math.abs(d-lastDist)>0.1){
-        zoomAt(mp.x, mp.y, d/lastDist);
+      // Classify once, after leaving a deadzone, so a 2-finger SCROLL doesn't
+      // get hijacked by tiny distance jitter into a zoom.
+      if(gmode===null){
+        const dD=Math.abs(d-startDist);
+        const dM=Math.hypot(mp.x-startMid.x, mp.y-startMid.y);
+        if(dD>GZONE && dD>=dM)      gmode='zoom';
+        else if(dM>GZONE)           gmode=(scale>1 ? 'pan' : 'scroll');
       }
-      // Two-finger drag: pan the view when zoomed in; otherwise scroll the host.
-      if(scale>1){
+      if(gmode==='zoom'){
+        zoomAt(mp.x, mp.y, d/lastDist);
+      } else if(gmode==='pan'){
         panX+=mp.x-lastMid.x; panY+=mp.y-lastMid.y; clampPan(); applyTransform();
-      } else {
-        const dy=mp.y-lastMid.y; if(Math.abs(dy)>1) send({t:'s',dy:-dy*3,dx:0});
+      } else if(gmode==='scroll'){
+        scrollAcc += (mp.y-lastMid.y);
+        while(Math.abs(scrollAcc) >= SCROLL_STEP){
+          const dir = scrollAcc>0 ? 1 : -1;     // dir>0 = fingers moved down
+          send({t:'s', dy: -dir, dx: 0});       // fingers down -> scroll up (natural)
+          scrollAcc -= dir*SCROLL_STEP;
+        }
       }
       lastDist=d; lastMid=mp;
       return;

@@ -63,6 +63,10 @@ class Config:
     # bandwidth while watching a mostly-static pipeline). A keepalive frame is
     # still sent every KEEPALIVE_SECONDS.
     KEEPALIVE_SECONDS = _float("RD_KEEPALIVE_SECONDS", 1.0)
+    # Draw the host's mouse cursor into the stream so you can see it follow.
+    SHOW_CURSOR = os.environ.get("RD_SHOW_CURSOR", "1") != "0"
+    # Which webcam to stream when the camera button is selected.
+    WEBCAM_INDEX = _int("RD_WEBCAM_INDEX", 0)
 
     def validate(self):
         if not (self.PASSWORD or self.PASSWORD_HASH):

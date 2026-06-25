@@ -26,7 +26,7 @@ from fastapi.responses import JSONResponse, FileResponse, Response
 
 from config import config
 import auth
-from capture import ScreenCapturer
+from capture import ScreenCapturer, WebcamSource
 from controller import InputController
 
 STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
@@ -148,6 +148,7 @@ async def logout(request: Request):
 class Session:
     def __init__(self):
         self.monitor = 1
+        self.source = "screen"           # "screen" or "webcam"
         self.quality = config.JPEG_QUALITY
         self.fps = config.TARGET_FPS
         self.ready = threading.Event()   # set when the browser can take a frame
@@ -173,15 +174,19 @@ def capture_thread(sess: Session, loop, queue: asyncio.Queue):
     # tell the client what's available, right away
     push(("monitors", {"list": sess.monitors, "current": sess.monitor}))
 
+    webcam = WebcamSource(config.WEBCAM_INDEX)
+
     last_sig = None
     last_send = 0.0
-    sent_monitor = None
+    sent_key = None
+    last_cursor = None
 
     while not sess.stop.is_set():
         if not sess.ready.wait(timeout=0.1):
             continue
         with sess.lock:
             idx = sess.monitor
+            source = sess.source
             quality = sess.quality
             interval = sess.fps_interval()
             switched = sess.monitor_changed
@@ -192,16 +197,24 @@ def capture_thread(sess: Session, loop, queue: asyncio.Queue):
         if gap < interval:
             time.sleep(interval - gap)
 
-        try:
-            bgr = sc.grab(idx)
-        except Exception:
-            time.sleep(0.1)
-            continue
+        if source == "webcam":
+            frame = webcam.grab()
+            if frame is None:
+                frame = ScreenCapturer.placeholder("Webcam not connected")
+            cursor = None
+        else:
+            try:
+                frame = sc.grab(idx)
+            except Exception:
+                time.sleep(0.1)
+                continue
+            cursor = sc.cursor_in(idx) if config.SHOW_CURSOR else None
 
-        sig = ScreenCapturer.signature(bgr)
+        sig = ScreenCapturer.signature(frame)
         changed = (
             switched
             or sig != last_sig
+            or cursor != last_cursor          # send a frame when the cursor moves
             or (time.time() - last_send) > config.KEEPALIVE_SECONDS
         )
         if not changed:
@@ -209,17 +222,22 @@ def capture_thread(sess: Session, loop, queue: asyncio.Queue):
             time.sleep(interval)
             continue
 
-        jpeg = ScreenCapturer.encode_jpeg(bgr, quality)
+        if cursor is not None:
+            ScreenCapturer.draw_cursor(frame, cursor[0], cursor[1])
+        jpeg = ScreenCapturer.encode_jpeg(frame, quality)
         last_sig = sig
+        last_cursor = cursor
         last_send = time.time()
         sess.ready.clear()
 
-        if switched or sent_monitor != idx:
-            h, w = bgr.shape[0], bgr.shape[1]
-            push(("info", {"mon": idx, "w": int(w), "h": int(h)}))
-            sent_monitor = idx
+        key = "cam" if source == "webcam" else idx
+        if switched or sent_key != key:
+            h, w = frame.shape[0], frame.shape[1]
+            push(("info", {"mon": key, "w": int(w), "h": int(h)}))
+            sent_key = key
         push(("frame", jpeg))
 
+    webcam.release()
     push(("close", None))
 
 
@@ -280,8 +298,15 @@ async def ws_endpoint(ws: WebSocket):
             if 1 <= i <= len(sess.monitors):
                 with sess.lock:
                     sess.monitor = i
+                    sess.source = "screen"
                     sess.monitor_changed = True
                 sess.ready.set()
+            return
+        if t == "cam":
+            with sess.lock:
+                sess.source = "webcam"
+                sess.monitor_changed = True
+            sess.ready.set()
             return
         if t == "q":
             with sess.lock:
@@ -289,6 +314,10 @@ async def ws_endpoint(ws: WebSocket):
                     sess.quality = max(10, min(95, int(m["jpeg"])))
                 if "fps" in m:
                     sess.fps = max(1, min(30, int(m["fps"])))
+            return
+
+        # the webcam view isn't controllable -- ignore pointer/scroll there
+        if sess.source == "webcam" and t in ("m", "d", "u", "dc", "s"):
             return
 
         # input events use normalized (0..1) coordinates within the current
