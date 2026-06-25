@@ -67,6 +67,9 @@ class Config:
     SHOW_CURSOR = os.environ.get("RD_SHOW_CURSOR", "1") != "0"
     # Which webcam to stream when the camera button is selected.
     WEBCAM_INDEX = _int("RD_WEBCAM_INDEX", 0)
+    # Optional system-audio (loopback) streaming.
+    AUDIO_RATE = _int("RD_AUDIO_RATE", 48000)     # mono PCM sample rate
+    AUDIO_BLOCK = _int("RD_AUDIO_BLOCK", 2048)    # frames per capture chunk
 
     def validate(self):
         if not (self.PASSWORD or self.PASSWORD_HASH):

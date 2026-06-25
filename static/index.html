@@ -165,6 +165,7 @@
     <div class="mrow act" id="refreshRow"><span>Refresh page</span><span class="stat">Ctrl R</span></div>
     <div class="mrow act" id="hardRefreshRow"><span>Hard refresh page</span><span class="stat">Ctrl ⇧ R</span></div>
     <div class="mrow act" id="reloadViewerRow"><span>Reload viewer</span><span class="stat">↻</span></div>
+    <div class="mrow act" id="audioRow"><span>Audio (system)</span><span class="stat" id="audioState">Off</span></div>
     <hr>
     <div class="mhead">Status</div>
     <div class="mrow"><span>Connection</span><span class="stat" id="mState">…</span></div>
@@ -396,6 +397,35 @@ function sendCombo(codes){
 $('refreshRow').onclick     =()=>{ sendCombo(['ControlLeft','KeyR']); closeMenu(); toast('Sent refresh'); };
 $('hardRefreshRow').onclick =()=>{ sendCombo(['ControlLeft','ShiftLeft','KeyR']); closeMenu(); toast('Sent hard refresh'); };
 $('reloadViewerRow').onclick=()=>{ location.reload(); };
+
+/* ---------------- optional system audio (Web Audio playback of streamed PCM) -- */
+let actx=null, aws=null, aRate=48000, playTime=0, audioOn=false;
+function audioStart(){
+  try{ actx = actx || new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ toast('Audio unsupported'); return; }
+  if(actx.state==='suspended') actx.resume();
+  const proto = location.protocol==='https:' ? 'wss' : 'ws';
+  aws = new WebSocket(proto+'://'+location.host+'/audio');
+  aws.binaryType='arraybuffer';
+  aws.onmessage = ev=>{
+    if(typeof ev.data==='string'){ try{ const d=JSON.parse(ev.data); if(d.t==='afmt') aRate=d.rate; }catch(e){} return; }
+    if(!actx) return;
+    const i16=new Int16Array(ev.data); const f=new Float32Array(i16.length);
+    for(let i=0;i<i16.length;i++) f[i]=i16[i]/32768;
+    const buf=actx.createBuffer(1, f.length, aRate); buf.copyToChannel(f,0,0);
+    const src=actx.createBufferSource(); src.buffer=buf; src.connect(actx.destination);
+    const now=actx.currentTime;
+    if(playTime < now+0.05) playTime = now+0.08;   // small jitter buffer
+    src.start(playTime); playTime += buf.duration;
+  };
+  aws.onclose = ()=>{ if(audioOn) setAudio(false); };
+  aws.onerror = ()=>{ try{aws.close();}catch(e){} };
+}
+function audioStop(){ if(aws){ try{aws.close();}catch(e){} aws=null; } playTime=0; }
+function setAudio(on){
+  audioOn=on; $('audioState').textContent=on?'On':'Off';
+  if(on) audioStart(); else audioStop();
+}
+$('audioRow').onclick=()=>setAudio(!audioOn);
 
 /* ---------------- modifier indicators ---------------- */
 const heldMods=new Set();

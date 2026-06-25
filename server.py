@@ -369,6 +369,66 @@ async def ws_endpoint(ws: WebSocket):
         ctrl.release_all()  # never leave a key/button stuck
 
 
+# --------------------------------------------------------------------------- #
+# Optional audio: stream the host's system output (WASAPI loopback) as raw PCM
+# --------------------------------------------------------------------------- #
+@app.websocket("/audio")
+async def audio_endpoint(ws: WebSocket):
+    if not _origin_allowed(ws):
+        await ws.close(code=4403)
+        return
+    if not auth.validate_token(ws.cookies.get(config.COOKIE_NAME)):
+        await ws.close(code=4401)
+        return
+    await ws.accept()
+    rate = config.AUDIO_RATE
+    await ws.send_text(json.dumps({"t": "afmt", "rate": rate, "ch": 1}))
+
+    loop = asyncio.get_event_loop()
+    queue: asyncio.Queue = asyncio.Queue(maxsize=32)
+    stop = threading.Event()
+
+    def push(item):
+        def _put():
+            try:
+                queue.put_nowait(item)
+            except asyncio.QueueFull:
+                pass  # drop a chunk rather than build latency
+        loop.call_soon_threadsafe(_put)
+
+    def capture():
+        try:
+            import numpy as np
+            import soundcard as sc
+        except Exception:
+            push(None)
+            return
+        try:
+            spk = sc.default_speaker()
+            mic = sc.get_microphone(spk.name, include_loopback=True)
+            with mic.recorder(samplerate=rate, channels=1,
+                              blocksize=config.AUDIO_BLOCK) as rec:
+                while not stop.is_set():
+                    data = rec.record(numframes=config.AUDIO_BLOCK)  # float32 (n,1)
+                    mono = np.clip(data[:, 0], -1.0, 1.0)
+                    pcm = (mono * 32767.0).astype("<i2").tobytes()
+                    push(pcm)
+        except Exception:
+            push(None)
+
+    threading.Thread(target=capture, daemon=True).start()
+    try:
+        while True:
+            chunk = await queue.get()
+            if chunk is None:
+                break
+            await ws.send_bytes(chunk)
+    except (WebSocketDisconnect, Exception):
+        pass
+    finally:
+        stop.set()
+
+
 if __name__ == "__main__":
     config.validate()
     print("Remote desktop server on http://%s:%d" % (config.HOST, config.PORT))

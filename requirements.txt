@@ -4,3 +4,4 @@ mss>=9.0
 pynput>=1.7
 numpy>=1.24
 opencv-python-headless>=4.8
+soundcard>=0.4   # optional system-audio (loopback) streaming
