@@ -53,10 +53,17 @@ class ScreenCapturer:
 
     @staticmethod
     def draw_cursor(bgr, x, y):
-        """Draw an arrow pointer (white fill, black outline) at (x, y)."""
-        pts = _CURSOR_PTS + (x, y)
+        """Draw an arrow pointer (white fill, black outline) at (x, y).
+
+        mss frames are a non-contiguous BGRA->BGR view that cv2 cannot draw onto,
+        so make a contiguous copy first. Returns the array to draw/encode.
+        """
+        if not bgr.flags["C_CONTIGUOUS"]:
+            bgr = np.ascontiguousarray(bgr)
+        pts = _CURSOR_PTS + (int(x), int(y))
         cv2.fillPoly(bgr, [pts], (255, 255, 255))
         cv2.polylines(bgr, [pts], True, (0, 0, 0), 1, cv2.LINE_AA)
+        return bgr
 
     def list_monitors(self):
         out = []

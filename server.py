@@ -231,7 +231,7 @@ def capture_thread(sess: Session, loop, queue: asyncio.Queue):
             continue
 
         if cursor is not None:
-            ScreenCapturer.draw_cursor(frame, cursor[0], cursor[1])
+            frame = ScreenCapturer.draw_cursor(frame, cursor[0], cursor[1])
         jpeg = ScreenCapturer.encode_jpeg(frame, quality)
         last_sig = sig
         last_cursor = cursor
