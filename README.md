@@ -211,6 +211,36 @@ remote attacks:
 front of a named tunnel (see "Permanent URL" above) to require a second factor
 (email OTP or your identity provider) before anyone even reaches the login page.
 
+## Windows security prompts can lock out remote control
+
+UAC and "Windows Security" credential prompts run on the **secure desktop** — an
+isolated surface that freezes the normal desktop's cursor and blocks *any* normal
+program (including this tool) from seeing or clicking it. So if such a prompt
+appears, remote control freezes until the prompt is answered, and you can't answer
+it remotely.
+
+**Recovery (works remotely):** reboot the PC. With auto-login enabled it logs back
+in and the startup watchdog relaunches the stream automatically. (You can reboot
+from an integrated terminal in the remote VS Code: `shutdown /r /t 0 /f`.)
+
+**Optional hardening — `apply-hardening.ps1` (must be run once AT THE PC):**
+It requires one UAC approval on the secure desktop, which *cannot* be clicked over
+the remote stream — so this is the one step that needs physical/local access. There
+is no remote workaround: every path to admin (even Windows `sudo`) raises that same
+UAC prompt by design. Once applied it:
+1. sets `PromptOnSecureDesktop = 0` so UAC prompts appear on the normal desktop
+   (no full-screen freeze), and
+2. registers an **elevated** scheduled task `RemotePCStream` that runs the stream
+   watchdog (`watchdog.ps1 -StreamOnly`) at logon, so it can drive elevated/UAC
+   windows. Chrome + VS Code keep running non-elevated via the Startup launcher
+   (`watchdog.ps1 -AppsOnly`).
+
+Both **lower Windows' elevation protection** — reasonable for a single-user remote
+box, but understand the tradeoff. To undo: delete the `RemotePCStream` task, set
+`PromptOnSecureDesktop` back to `1`, and restore the Startup `.bat` to run
+`watchdog.ps1` with no arguments. Note: this mitigates **UAC** prompts; some
+app-driven credential/Windows-Hello dialogs may still appear separately.
+
 ## Troubleshooting
 
 - **Black screen / capture fails on Linux** → you're probably on Wayland; switch
