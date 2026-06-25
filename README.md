@@ -138,6 +138,15 @@ verification you plan to add.
 | `RD_TARGET_FPS` | `15` | Max frame rate (static screens send fewer) |
 | `RD_SESSION_TTL` | `28800` | Session lifetime, seconds (8h) |
 | `RD_SECRET` | random | **Set a stable value to keep sessions valid across restarts.** Sessions are stateless HMAC-signed tokens keyed by this; if it changes, everyone is logged out. `secrets.local.ps1` sets it. |
+| `RD_TELEGRAM_TOKEN` | — | Telegram bot token for login notifications (optional) |
+| `RD_TELEGRAM_CHAT_ID` | — | Your Telegram chat id (optional) |
+
+> **Login notifications (Telegram):** if both `RD_TELEGRAM_*` are set, you get a
+> Telegram message on every successful login (user, IP, time, device) and when an
+> IP is locked out after too many failed attempts. Setup: message **@BotFather**
+> → `/newbot` → copy the token; message your new bot once; run
+> `.venv\Scripts\python.exe get_chat_id.py <TOKEN>` to get your chat id; put both
+> in `secrets.local.ps1`; restart.
 
 > **Sessions:** signed tokens that survive server restarts (as long as
 > `RD_SECRET` is stable) and last **8 hours** — short, because this tool fully

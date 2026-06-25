@@ -50,6 +50,10 @@ class Config:
         h.strip() for h in os.environ.get("RD_ALLOWED_ORIGINS", "").split(",")
         if h.strip()
     ]
+    # Login notifications via Telegram (optional). Set both in secrets.local.ps1.
+    TELEGRAM_TOKEN = os.environ.get("RD_TELEGRAM_TOKEN", "")
+    TELEGRAM_CHAT_ID = os.environ.get("RD_TELEGRAM_CHAT_ID", "")
+
     # Trust Cloudflare's CF-Connecting-IP for the real client address (the tunnel
     # itself always connects from 127.0.0.1, which would otherwise collapse all
     # clients into one rate-limit bucket). Safe because only the local tunnel and

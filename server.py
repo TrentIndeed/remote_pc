@@ -26,6 +26,7 @@ from fastapi.responses import JSONResponse, FileResponse, Response
 
 from config import config
 import auth
+import notify
 from capture import ScreenCapturer, WebcamSource
 from controller import InputController
 
@@ -115,9 +116,13 @@ async def login(request: Request):
         body = await request.json()
     except Exception:
         body = {}
+    ua = request.headers.get("user-agent", "?")
+    when = time.strftime("%Y-%m-%d %H:%M:%S")
     if auth.check_credentials(body.get("username", ""), body.get("password", "")):
         auth.clear_failures(ip)
         token = auth.create_session()
+        notify.send("✅ Remote desktop login\nUser: %s\nIP: %s\nTime: %s\nDevice: %s"
+                    % (config.USERNAME, ip, when, ua))
         resp = JSONResponse({"ok": True})
         resp.set_cookie(
             config.COOKIE_NAME, token,
@@ -126,6 +131,9 @@ async def login(request: Request):
         )
         return resp
     auth.record_failure(ip)
+    if auth.is_locked(ip):   # this failure just crossed the lockout threshold
+        notify.send("\U0001f6ab Remote desktop: too many failed logins — IP locked out\nIP: %s\nTime: %s\nDevice: %s"
+                    % (ip, when, ua))
     # Slow brute force without blocking the event loop.
     await asyncio.sleep(config.FAILED_LOGIN_DELAY)
     return JSONResponse({"error": "Invalid credentials"}, status_code=401)
